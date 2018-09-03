@@ -3,17 +3,113 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>https:///q2118cs.github.io/categories/</loc>
+    <loc>http://www.ruibg.com/links/</loc>
+    <lastmod>2014-04-09T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/about/</loc>
+    <lastmod>2014-04-09T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/resume/</loc>
+    <lastmod>2017-12-01T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/post/creating-a-new-theme/</loc>
+    <lastmod>2014-09-28T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/post/goisforlovers/</loc>
+    <lastmod>2014-07-28T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/post/hugoisforlovers/</loc>
+    <lastmod>2014-04-02T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/post/migrate-from-jekyll/</loc>
+    <lastmod>2014-03-10T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/post/hugo-nuo-post-preview/</loc>
+    <lastmod>2013-07-17T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/categories/</loc>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>https:///q2118cs.github.io/</loc>
+    <loc>http://www.ruibg.com/tags/development/</loc>
+    <lastmod>2014-07-28T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>https:///q2118cs.github.io/tags/</loc>
+    <loc>http://www.ruibg.com/tags/go/</loc>
+    <lastmod>2014-07-28T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/tags/golang/</loc>
+    <lastmod>2014-07-28T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/tags/hugo/</loc>
+    <lastmod>2014-09-28T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/tags/markdown/</loc>
+    <lastmod>2013-07-17T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/post/</loc>
+    <lastmod>2014-09-28T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/tags/</loc>
+    <lastmod>2014-07-28T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/tags/templates/</loc>
+    <lastmod>2014-07-28T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/tags/theme/</loc>
+    <lastmod>2014-09-28T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/tags/themes/</loc>
+    <lastmod>2014-07-28T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://www.ruibg.com/</loc>
+    <lastmod>2014-04-09T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>
   
