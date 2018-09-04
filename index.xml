@@ -6,7 +6,7 @@
     <description>Recent content on 懒猫博客</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en</language>
-    <copyright>© This post is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License，please give source if you wish to quote or reproduce.</copyright>
+    <copyright>Copyright © 2018 - 2018  懒猫raibg.com 版权所有</copyright>
     <lastBuildDate>Wed, 09 Apr 2014 00:00:00 +0000</lastBuildDate>
     
 	<atom:link href="http://www.ruibg.com/index.xml" rel="self" type="application/rss+xml" />
@@ -19,17 +19,6 @@
       
       <guid>http://www.ruibg.com/links/</guid>
       <description>Ritchie and his friends.</description>
-    </item>
-    
-    <item>
-      <title>About</title>
-      <link>http://www.ruibg.com/about/</link>
-      <pubDate>Wed, 09 Apr 2014 00:00:00 +0000</pubDate>
-      
-      <guid>http://www.ruibg.com/about/</guid>
-      <description>Hugo is a static site engine written in Go.
-It makes use of a variety of open source projects including:
- Cobra Viper J Walter Weatherman Cast  Learn more and contribute on GitHub.</description>
     </item>
     
     <item>
@@ -95,6 +84,17 @@ Follow the following steps:
       <description>&lt;p&gt;这篇文章集中说明本人博客主题所支持的 Markdown 语法和 Hugo Shortcodes 插件，你也可以在这里预览到他们的样子。如果你不喜欢某些部分的样式，可以去修改 &lt;code&gt;content.scss&lt;/code&gt; 和 &lt;code&gt;shortcodes.scss&lt;/code&gt; 这两个文件。预告一下，我所用的这个名为 &lt;code&gt;Nuo&lt;/code&gt; 的 &lt;code&gt;Hugo&lt;/code&gt; 也将于近期发布，敬请期待。&lt;/p&gt;
 
 &lt;p&gt;&lt;/p&gt;</description>
+    </item>
+    
+    <item>
+      <title>关于我</title>
+      <link>http://www.ruibg.com/about/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://www.ruibg.com/about/</guid>
+      <description>  搞搞开发，码码代码，开开心心，快乐生活。
+ 简介 &amp;emsp;&amp;emsp;我是一名技术爱好者，目前主要研究JAVA、PYTHON、GO、前端。享受编程、热爱开源、热爱生活。写这个博客主要为了记录平常的收获并为了分享自己的心得体会。
+联系方式  QQ：349106921 微信：q2118cs 邮箱：q2118cs@vip.qq.com 博客：懒猫博客  </description>
     </item>
     
   </channel>
