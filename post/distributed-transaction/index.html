@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+  <meta charset="utf-8" />
+
+  
+  <title>分布式事务及解决方案</title>
+
+  
+  
+
+
+
+
+
+  
+  <meta name="author" content="懒猫" />
+  <meta name="description" content="前言 &amp;emsp;&amp;emsp;随着现代技术的发展，分布式已经成为程序员必须掌握的一项技能了，特别是最近很火的微服务，更进一步推动了分布式的发展。
+&amp;emsp;&amp;emsp;提到分布式一个绕不开的话题就是分布式事务。那么什么是分布式事务:
+ 分布式事务是指事务的参与者、支持事务的服务器、资源服务器以及事务管理器分别位于不同的分布式系统的不同节点之上。
+ 以上是百度百科对分布式事务的解释。也就是说一次操作涉及许多系统，分布式事务就是要这些系统里的操作要么都成功，要么都失败，以保证最终数据的一致性。
+数据库事务 &amp;emsp;&amp;emsp;再说分布式事务之前，我们先来回顾下数据库的事务。数据库事务有四个特性：原子性(Atomicity )、一致性( Consistency )、隔离性或独立性( Isolation)和持久性(Durabilily)，简称就是ACID。下面我们来看一下这四种特性数据库是怎么保证的。
+原子性(Atomicity)  &amp;emsp;&amp;emsp;想要保证事务的原子性，就需要在异常发生时，对已经执行的操作进行回滚，在MySQL中，恢复机制是通过回滚日志（undo log）实现的，所有事务进行的修改都会先记录到这个回滚日志中，然后在对数据库中的对应行进行写入。
+&amp;emsp;&amp;emsp;就像你去超市东西要么交钱拿东西一起都执行，要么要是买不到东西，就退钱。
+ 隔离性(Isolation)  可参考此图理解，详细就不在表述了。
+ 持久性(Durability)  &amp;emsp;&amp;emsp;意味着在事务完成以后，该事务所对数据库所作的更改便持久的保存在数据库之中，并不会被回滚。即使出现了任何事故比如断电等，事务一旦提交，则持久化保存在数据库中。
+ 一致性(Consistency)  &amp;emsp;&amp;emsp;事务的一致性指的是在一个事务执行之前和执行之后数据库都必须处于一致性状态。如果事务成功地完成，那么系统中所有变化将正确地应用，系统处于有效状态。如果在事务中出现错误，那么系统中的所有变化将自动地回滚，系统返回到原始状态。
+&amp;emsp;&amp;emsp;一致性是事务要达到的最终状态。一致性可以区分为“外部一致性”和“内部一致性”。所谓的“内部一致性”就是指单机事务的一致性。“外部一致性”是针对分布式系统来说的，由于分布式系统写入和读取可能不在同一台机器上，而这必然会有一段时间导致不同机器上所存的数据不一致的情况，这就是所谓的“不一致时间窗口”。
+ 分布式事务 分布式事务产生的原因 1）数据库数据量大，对数据库进行分库分表。
+2）业务拆分。比如电商业务会有商品、订单、支付、促销等服务域，每个域都有各自独立的数据库。
+分布式事务的基础 &amp;emsp;&amp;emsp;在分布式事务中，ACID是很难达到的，即使达到了性能也会受到很大的影响，这种时候需要一个新的理论来支持分布式事务，也就是CAP理论和BASE理论。
+CAP理论 CAP理论又被叫作布鲁尔定理。对于设计分布式系统来说CAP就是入门理论。
+ C (一致性，Consistency):对某个指定的客户端来说，读操作能返回最新的写操作。对于数据分布在不同节点上的数据上来说，如果在某个节点更新了数据，那么在其他节点如果都能读取到这个最新的数据，那么就称为强一致，如果有某个节点没有读取到，那就是分布式不一致。 A(可用性，Availability)：非故障的节点在合理的时间内返回合理的响应(不是错误和超时的响应)。可用性的两个关键一个是合理的时间，一个是合理的响应。合理的时间指的是请求不能无限被阻塞，应该在合理的时间给出返回。合理的响应指的是系统应该明确返回结果并且结果是正确的。 P(分区容错性，Partition tolerance):当出现网络分区后，系统能够继续工作。打个比方，这里个集群有多台机器，有台机器网络出现了问题，但是这个集群仍然可以正常工作。
+  &amp;emsp;&amp;emsp;在分布式系统中，网络无法100%可靠，分区其实是一个必然现象，如果我们选择了一致性、可用性而放弃了分区容错性，那么当发生分区现象时，为了保证一致性，这个时候必须拒绝请求，但是可用性又不允许，所以分布式系统理论上不可能选择一致性、可用性架构，只能选择一致性、分区容错性或者可用性、分区容错性架构。
+&amp;emsp;&amp;emsp;对于CP来说，放弃可用性，追求一致性和分区容错性，zookeeper其实就是追求的强一致。
+&amp;emsp;&amp;emsp;对于AP来说，放弃一致性(这里说的一致性是强一致性)，追求分区容错性和可用性，这是很多分布式系统设计时的选择，后面的BASE也是根据AP来扩展。
+&amp;emsp;&amp;emsp;CAP理论中是忽略网络延迟，但是在现实中总会有一定的时间是不一致。同时CAP中选择两个，比如你选择了CP，并不是叫你放弃A。因为P出现的概率实在是太小了，大部分的时间你仍然需要保证CA。就算分区出现了你也要为后来的A做准备，比如通过一些日志的手段，使其他机器回复至可用，这叫做补偿事务。
+BASE理论 在分布式系统中，我们往往追求的是可用性，它的重要程序比一致性要高，那么如何实现高可用性呢？ 前人已经给我们提出来了另外一个理论，就是BASE理论，它是用来对CAP定理进行进一步扩充的。BASE理论指的是：
+ Basically Available（基本可用）:分布式系统在出现故障时，允许损失部分可用功能，保证核心功能可用。 Soft state（软状态）：允许系统中存在中间状态，这个状态不影响系统可用性，这里指的是CAP中的不一致。 Eventually consistent（最终一致性）：最终一致:最终一致是指经过一段时间后，所有节点数据都将会达到一致。  &amp;emsp;&amp;emsp;BASE解决了CAP中理论没有网络延迟，在BASE中用软状态和最终一致，保证了延迟后的一致性。BASE和 ACID 是相反的，它完全不同于ACID的强一致性模型，而是通过牺牲强一致性来获得可用性，并允许数据在一段时间内是不一致的，但最终达到一致状态。
+分布式事务解决方案 &amp;emsp;&amp;emsp;再说解决方案之前，我们先思考下是否一定需要分布式事务。在我们进行系统架构设计之前，要考虑到开发成本，防止过度设计，有时候可以把需要事务的微服务聚合成一个单机服务，使用数据库的单机事务。因为分布式事务的开发成本还是很高的，千万不要为了追求设计，尔引入不必要的成本和复杂度。
+基于XA协议的两阶段提交（2PC） &amp;emsp;&amp;emsp;分为两个阶段：第一阶段是表决阶段，所有参与者都将本事务能否成功的信息反馈发给协调者；第二阶段是执行阶段，协调者根据所有参与者的反馈，通知所有参与者，步调一致地在所有分支上提交或者回滚。" />
+
+  
+  
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:site" content="@gohugoio" />
+    <meta name="twitter:title" content="分布式事务及解决方案" />
+    <meta name="twitter:description" content="前言 &amp;emsp;&amp;emsp;随着现代技术的发展，分布式已经成为程序员必须掌握的一项技能了，特别是最近很火的微服务，更进一步推动了分布式的发展。
+&amp;emsp;&amp;emsp;提到分布式一个绕不开的话题就是分布式事务。那么什么是分布式事务:
+ 分布式事务是指事务的参与者、支持事务的服务器、资源服务器以及事务管理器分别位于不同的分布式系统的不同节点之上。
+ 以上是百度百科对分布式事务的解释。也就是说一次操作涉及许多系统，分布式事务就是要这些系统里的操作要么都成功，要么都失败，以保证最终数据的一致性。
+数据库事务 &amp;emsp;&amp;emsp;再说分布式事务之前，我们先来回顾下数据库的事务。数据库事务有四个特性：原子性(Atomicity )、一致性( Consistency )、隔离性或独立性( Isolation)和持久性(Durabilily)，简称就是ACID。下面我们来看一下这四种特性数据库是怎么保证的。
+原子性(Atomicity)  &amp;emsp;&amp;emsp;想要保证事务的原子性，就需要在异常发生时，对已经执行的操作进行回滚，在MySQL中，恢复机制是通过回滚日志（undo log）实现的，所有事务进行的修改都会先记录到这个回滚日志中，然后在对数据库中的对应行进行写入。
+&amp;emsp;&amp;emsp;就像你去超市东西要么交钱拿东西一起都执行，要么要是买不到东西，就退钱。
+ 隔离性(Isolation)  可参考此图理解，详细就不在表述了。
+ 持久性(Durability)  &amp;emsp;&amp;emsp;意味着在事务完成以后，该事务所对数据库所作的更改便持久的保存在数据库之中，并不会被回滚。即使出现了任何事故比如断电等，事务一旦提交，则持久化保存在数据库中。
+ 一致性(Consistency)  &amp;emsp;&amp;emsp;事务的一致性指的是在一个事务执行之前和执行之后数据库都必须处于一致性状态。如果事务成功地完成，那么系统中所有变化将正确地应用，系统处于有效状态。如果在事务中出现错误，那么系统中的所有变化将自动地回滚，系统返回到原始状态。
+&amp;emsp;&amp;emsp;一致性是事务要达到的最终状态。一致性可以区分为“外部一致性”和“内部一致性”。所谓的“内部一致性”就是指单机事务的一致性。“外部一致性”是针对分布式系统来说的，由于分布式系统写入和读取可能不在同一台机器上，而这必然会有一段时间导致不同机器上所存的数据不一致的情况，这就是所谓的“不一致时间窗口”。
+ 分布式事务 分布式事务产生的原因 1）数据库数据量大，对数据库进行分库分表。
+2）业务拆分。比如电商业务会有商品、订单、支付、促销等服务域，每个域都有各自独立的数据库。
+分布式事务的基础 &amp;emsp;&amp;emsp;在分布式事务中，ACID是很难达到的，即使达到了性能也会受到很大的影响，这种时候需要一个新的理论来支持分布式事务，也就是CAP理论和BASE理论。
+CAP理论 CAP理论又被叫作布鲁尔定理。对于设计分布式系统来说CAP就是入门理论。
+ C (一致性，Consistency):对某个指定的客户端来说，读操作能返回最新的写操作。对于数据分布在不同节点上的数据上来说，如果在某个节点更新了数据，那么在其他节点如果都能读取到这个最新的数据，那么就称为强一致，如果有某个节点没有读取到，那就是分布式不一致。 A(可用性，Availability)：非故障的节点在合理的时间内返回合理的响应(不是错误和超时的响应)。可用性的两个关键一个是合理的时间，一个是合理的响应。合理的时间指的是请求不能无限被阻塞，应该在合理的时间给出返回。合理的响应指的是系统应该明确返回结果并且结果是正确的。 P(分区容错性，Partition tolerance):当出现网络分区后，系统能够继续工作。打个比方，这里个集群有多台机器，有台机器网络出现了问题，但是这个集群仍然可以正常工作。
+  &amp;emsp;&amp;emsp;在分布式系统中，网络无法100%可靠，分区其实是一个必然现象，如果我们选择了一致性、可用性而放弃了分区容错性，那么当发生分区现象时，为了保证一致性，这个时候必须拒绝请求，但是可用性又不允许，所以分布式系统理论上不可能选择一致性、可用性架构，只能选择一致性、分区容错性或者可用性、分区容错性架构。
+&amp;emsp;&amp;emsp;对于CP来说，放弃可用性，追求一致性和分区容错性，zookeeper其实就是追求的强一致。
+&amp;emsp;&amp;emsp;对于AP来说，放弃一致性(这里说的一致性是强一致性)，追求分区容错性和可用性，这是很多分布式系统设计时的选择，后面的BASE也是根据AP来扩展。
+&amp;emsp;&amp;emsp;CAP理论中是忽略网络延迟，但是在现实中总会有一定的时间是不一致。同时CAP中选择两个，比如你选择了CP，并不是叫你放弃A。因为P出现的概率实在是太小了，大部分的时间你仍然需要保证CA。就算分区出现了你也要为后来的A做准备，比如通过一些日志的手段，使其他机器回复至可用，这叫做补偿事务。
+BASE理论 在分布式系统中，我们往往追求的是可用性，它的重要程序比一致性要高，那么如何实现高可用性呢？ 前人已经给我们提出来了另外一个理论，就是BASE理论，它是用来对CAP定理进行进一步扩充的。BASE理论指的是：
+ Basically Available（基本可用）:分布式系统在出现故障时，允许损失部分可用功能，保证核心功能可用。 Soft state（软状态）：允许系统中存在中间状态，这个状态不影响系统可用性，这里指的是CAP中的不一致。 Eventually consistent（最终一致性）：最终一致:最终一致是指经过一段时间后，所有节点数据都将会达到一致。  &amp;emsp;&amp;emsp;BASE解决了CAP中理论没有网络延迟，在BASE中用软状态和最终一致，保证了延迟后的一致性。BASE和 ACID 是相反的，它完全不同于ACID的强一致性模型，而是通过牺牲强一致性来获得可用性，并允许数据在一段时间内是不一致的，但最终达到一致状态。
+分布式事务解决方案 &amp;emsp;&amp;emsp;再说解决方案之前，我们先思考下是否一定需要分布式事务。在我们进行系统架构设计之前，要考虑到开发成本，防止过度设计，有时候可以把需要事务的微服务聚合成一个单机服务，使用数据库的单机事务。因为分布式事务的开发成本还是很高的，千万不要为了追求设计，尔引入不必要的成本和复杂度。
+基于XA协议的两阶段提交（2PC） &amp;emsp;&amp;emsp;分为两个阶段：第一阶段是表决阶段，所有参与者都将本事务能否成功的信息反馈发给协调者；第二阶段是执行阶段，协调者根据所有参与者的反馈，通知所有参与者，步调一致地在所有分支上提交或者回滚。" />
+    <meta name="twitter:image" content="http://www.ruibg.com/img/avatar.jpg" />
+  
+
+  
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="分布式事务及解决方案" />
+  <meta property="og:description" content="前言 &amp;emsp;&amp;emsp;随着现代技术的发展，分布式已经成为程序员必须掌握的一项技能了，特别是最近很火的微服务，更进一步推动了分布式的发展。
+&amp;emsp;&amp;emsp;提到分布式一个绕不开的话题就是分布式事务。那么什么是分布式事务:
+ 分布式事务是指事务的参与者、支持事务的服务器、资源服务器以及事务管理器分别位于不同的分布式系统的不同节点之上。
+ 以上是百度百科对分布式事务的解释。也就是说一次操作涉及许多系统，分布式事务就是要这些系统里的操作要么都成功，要么都失败，以保证最终数据的一致性。
+数据库事务 &amp;emsp;&amp;emsp;再说分布式事务之前，我们先来回顾下数据库的事务。数据库事务有四个特性：原子性(Atomicity )、一致性( Consistency )、隔离性或独立性( Isolation)和持久性(Durabilily)，简称就是ACID。下面我们来看一下这四种特性数据库是怎么保证的。
+原子性(Atomicity)  &amp;emsp;&amp;emsp;想要保证事务的原子性，就需要在异常发生时，对已经执行的操作进行回滚，在MySQL中，恢复机制是通过回滚日志（undo log）实现的，所有事务进行的修改都会先记录到这个回滚日志中，然后在对数据库中的对应行进行写入。
+&amp;emsp;&amp;emsp;就像你去超市东西要么交钱拿东西一起都执行，要么要是买不到东西，就退钱。
+ 隔离性(Isolation)  可参考此图理解，详细就不在表述了。
+ 持久性(Durability)  &amp;emsp;&amp;emsp;意味着在事务完成以后，该事务所对数据库所作的更改便持久的保存在数据库之中，并不会被回滚。即使出现了任何事故比如断电等，事务一旦提交，则持久化保存在数据库中。
+ 一致性(Consistency)  &amp;emsp;&amp;emsp;事务的一致性指的是在一个事务执行之前和执行之后数据库都必须处于一致性状态。如果事务成功地完成，那么系统中所有变化将正确地应用，系统处于有效状态。如果在事务中出现错误，那么系统中的所有变化将自动地回滚，系统返回到原始状态。
+&amp;emsp;&amp;emsp;一致性是事务要达到的最终状态。一致性可以区分为“外部一致性”和“内部一致性”。所谓的“内部一致性”就是指单机事务的一致性。“外部一致性”是针对分布式系统来说的，由于分布式系统写入和读取可能不在同一台机器上，而这必然会有一段时间导致不同机器上所存的数据不一致的情况，这就是所谓的“不一致时间窗口”。
+ 分布式事务 分布式事务产生的原因 1）数据库数据量大，对数据库进行分库分表。
+2）业务拆分。比如电商业务会有商品、订单、支付、促销等服务域，每个域都有各自独立的数据库。
+分布式事务的基础 &amp;emsp;&amp;emsp;在分布式事务中，ACID是很难达到的，即使达到了性能也会受到很大的影响，这种时候需要一个新的理论来支持分布式事务，也就是CAP理论和BASE理论。
+CAP理论 CAP理论又被叫作布鲁尔定理。对于设计分布式系统来说CAP就是入门理论。
+ C (一致性，Consistency):对某个指定的客户端来说，读操作能返回最新的写操作。对于数据分布在不同节点上的数据上来说，如果在某个节点更新了数据，那么在其他节点如果都能读取到这个最新的数据，那么就称为强一致，如果有某个节点没有读取到，那就是分布式不一致。 A(可用性，Availability)：非故障的节点在合理的时间内返回合理的响应(不是错误和超时的响应)。可用性的两个关键一个是合理的时间，一个是合理的响应。合理的时间指的是请求不能无限被阻塞，应该在合理的时间给出返回。合理的响应指的是系统应该明确返回结果并且结果是正确的。 P(分区容错性，Partition tolerance):当出现网络分区后，系统能够继续工作。打个比方，这里个集群有多台机器，有台机器网络出现了问题，但是这个集群仍然可以正常工作。
+  &amp;emsp;&amp;emsp;在分布式系统中，网络无法100%可靠，分区其实是一个必然现象，如果我们选择了一致性、可用性而放弃了分区容错性，那么当发生分区现象时，为了保证一致性，这个时候必须拒绝请求，但是可用性又不允许，所以分布式系统理论上不可能选择一致性、可用性架构，只能选择一致性、分区容错性或者可用性、分区容错性架构。
+&amp;emsp;&amp;emsp;对于CP来说，放弃可用性，追求一致性和分区容错性，zookeeper其实就是追求的强一致。
+&amp;emsp;&amp;emsp;对于AP来说，放弃一致性(这里说的一致性是强一致性)，追求分区容错性和可用性，这是很多分布式系统设计时的选择，后面的BASE也是根据AP来扩展。
+&amp;emsp;&amp;emsp;CAP理论中是忽略网络延迟，但是在现实中总会有一定的时间是不一致。同时CAP中选择两个，比如你选择了CP，并不是叫你放弃A。因为P出现的概率实在是太小了，大部分的时间你仍然需要保证CA。就算分区出现了你也要为后来的A做准备，比如通过一些日志的手段，使其他机器回复至可用，这叫做补偿事务。
+BASE理论 在分布式系统中，我们往往追求的是可用性，它的重要程序比一致性要高，那么如何实现高可用性呢？ 前人已经给我们提出来了另外一个理论，就是BASE理论，它是用来对CAP定理进行进一步扩充的。BASE理论指的是：
+ Basically Available（基本可用）:分布式系统在出现故障时，允许损失部分可用功能，保证核心功能可用。 Soft state（软状态）：允许系统中存在中间状态，这个状态不影响系统可用性，这里指的是CAP中的不一致。 Eventually consistent（最终一致性）：最终一致:最终一致是指经过一段时间后，所有节点数据都将会达到一致。  &amp;emsp;&amp;emsp;BASE解决了CAP中理论没有网络延迟，在BASE中用软状态和最终一致，保证了延迟后的一致性。BASE和 ACID 是相反的，它完全不同于ACID的强一致性模型，而是通过牺牲强一致性来获得可用性，并允许数据在一段时间内是不一致的，但最终达到一致状态。
+分布式事务解决方案 &amp;emsp;&amp;emsp;再说解决方案之前，我们先思考下是否一定需要分布式事务。在我们进行系统架构设计之前，要考虑到开发成本，防止过度设计，有时候可以把需要事务的微服务聚合成一个单机服务，使用数据库的单机事务。因为分布式事务的开发成本还是很高的，千万不要为了追求设计，尔引入不必要的成本和复杂度。
+基于XA协议的两阶段提交（2PC） &amp;emsp;&amp;emsp;分为两个阶段：第一阶段是表决阶段，所有参与者都将本事务能否成功的信息反馈发给协调者；第二阶段是执行阶段，协调者根据所有参与者的反馈，通知所有参与者，步调一致地在所有分支上提交或者回滚。" />
+  <meta property="og:url" content="http://www.ruibg.com/post/distributed-transaction/" />
+  <meta property="og:image" content="http://www.ruibg.com/img/avatar.jpg" />
+
+
+
+
+<meta name="generator" content="Hugo 0.47.1" />
+
+
+<link rel="canonical" href="http://www.ruibg.com/post/distributed-transaction/" />
+
+<meta name="renderer" content="webkit" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="format-detection" content="telephone=no,email=no,adress=no" />
+<meta http-equiv="Cache-Control" content="no-transform" />
+
+
+<meta name="robots" content="index,follow" />
+<meta name="referrer" content="origin-when-cross-origin" />
+
+<meta name="msvalidate.01" content="22596E34341DD1D17D6022C44647E587" />
+<meta name="baidu-site-verification" content="rC40lXEWUv" />
+
+
+
+
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="懒猫博客" />
+<meta name="msapplication-tooltip" content="懒猫博客" />
+<meta name='msapplication-navbutton-color' content="#5fbf5e" />
+<meta name="msapplication-TileColor" content="#5fbf5e" />
+<meta name="msapplication-TileImage" content="/img/tile-image-windows.png" />
+<link rel="icon" href="http://www.ruibg.com/img/favicon.ico" />
+<link rel="icon" type="image/png" sizes="16x16" href="http://www.ruibg.com/img/favicon-16x16.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="http://www.ruibg.com/img/favicon-32x32.png" />
+<link rel="icon" sizes="192x192" href="http://www.ruibg.com/img/touch-icon-android.png" />
+<link rel="apple-touch-icon" href="http://www.ruibg.com/img/touch-icon-apple.png" />
+<link rel="mask-icon" href="http://www.ruibg.com/img/safari-pinned-tab.svg" color="#5fbf5e" />
+
+
+
+<link rel="stylesheet" href="//cdn.bootcss.com/video.js/6.2.8/alt/video-js-cdn.min.css" />
+
+<link rel="stylesheet" href="http://www.ruibg.com/css/bundle.f59ab1db9c.css" />
+
+
+  
+  <!--[if lt IE 9]>
+    <script src="//cdn.bootcss.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+    <script src="//cdn.bootcss.com/respond.js/1.4.2/respond.min.js"></script>
+    <script src="//cdn.bootcss.com/video.js/6.2.8/ie8/videojs-ie8.min.js"></script>
+  <![endif]-->
+
+<!--[if lte IE 11]>
+    <script src="//cdn.bootcss.com/classlist/1.1.20170427/classList.min.js"></script>
+  <![endif]-->
+
+
+<script src="//cdn.bootcss.com/object-fit-images/3.2.3/ofi.min.js"></script>
+
+
+<script src="//cdn.bootcss.com/smooth-scroll/12.1.4/js/smooth-scroll.polyfills.min.js"></script>
+
+
+</head>
+  <body>
+    
+    <div class="suspension">
+      <a title="Go to top" class="to-top is-hide"><span class="icon icon-up"></span></a>
+      
+        
+        <a title="Go to comments" class="to-comment" href="#disqus_thread"><span class="icon icon-comment"></span></a>
+        
+      
+    </div>
+    
+    
+  <header class="site-header">
+  <img class="avatar" src="http://www.ruibg.com/img/head.jpg" alt="Avatar">
+  
+  <h2 class="title">懒猫博客</h2>
+  
+  <p class="subtitle">懒猫的博客--每天进步一点点</p>
+  <button class="menu-toggle" type="button">
+    <span class="icon icon-menu"></span>
+  </button>
+  <nav class="site-menu collapsed">
+    <h2 class="offscreen">Main Menu</h2>
+    <ul class="menu-list">
+      
+      
+      
+      
+        <li class="menu-item
+            
+            
+            
+              is-active
+            ">
+            <a href="http://www.ruibg.com/">首页</a>
+          </li>
+      
+        <li class="menu-item
+            
+            
+            ">
+            <a href="https://github.com/q2118cs">github</a>
+          </li>
+      
+        <li class="menu-item
+            
+            
+            ">
+            <a href="http://www.ruibg.com/about/">关于</a>
+          </li>
+      
+        <li class="menu-item
+            
+            
+            ">
+            <a href="http://www.ruibg.com/links/">友情链接</a>
+          </li>
+      
+        <li class="menu-item
+            
+            
+            ">
+            <a href="http://www.ruibg.com/tags/">标签</a>
+          </li>
+      
+        <li class="menu-item
+            
+            
+            ">
+            <a href="http://www.ruibg.com/links/">Links</a>
+          </li>
+      
+    </ul>
+  </nav>
+  <nav class="social-menu collapsed">
+    <h2 class="offscreen">Social Networks</h2>
+    <ul class="social-list">
+
+      
+      <li class="social-item">
+        <a href="mailto:q2118cs@vip.qq.com" title="Email"><span class="icon icon-email"></span></a>
+      </li>
+
+      
+      <li class="social-item">
+        <a href="//github.com/github_username" title="GitHub"><span class="icon icon-github"></span></a>
+      </li>
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      
+
+      <li class="social-item">
+        <a href="http://www.ruibg.com/img/qrcode.png" title="Wechat"><span class="icon icon-wechat"></span></a>
+      </li>
+
+      
+
+      
+
+      
+
+      
+
+      <li class="social-item">
+        <a rel="alternate" type="application/rss+xml" href="http://www.ruibg.com/index.xml"><span class="icon icon-rss" title="RSS"></span></a>
+      </li>
+
+    </ul>
+  </nav>
+</header>
+
+  <section class="main post-detail">
+    <header class="post-header">
+      <h1 class="post-title">分布式事务及解决方案</h1>
+      <p class="post-meta">@懒猫 · Sep 4, 2018 · 1 min read</p>
+    </header>
+    <article class="post-content">
+
+<h3 id="前言">前言</h3>
+
+<p>&emsp;&emsp;随着现代技术的发展，分布式已经成为程序员必须掌握的一项技能了，特别是最近很火的微服务，更进一步推动了分布式的发展。<br />
+&emsp;&emsp;提到分布式一个绕不开的话题就是分布式事务。那么什么是分布式事务:</p>
+
+<blockquote>
+<p>分布式事务是指事务的参与者、支持事务的服务器、资源服务器以及事务管理器分别位于不同的分布式系统的不同节点之上。</p>
+</blockquote>
+
+<p>以上是百度百科对分布式事务的解释。也就是说一次操作涉及许多系统，分布式事务就是要这些系统里的操作要么都成功，要么都失败，以保证最终数据的一致性。</p>
+
+<h3 id="数据库事务">数据库事务</h3>
+
+<p>&emsp;&emsp;再说分布式事务之前，我们先来回顾下数据库的事务。数据库事务有四个特性：原子性(Atomicity )、一致性( Consistency )、隔离性或独立性( Isolation)和持久性(Durabilily)，简称就是ACID。下面我们来看一下这四种特性数据库是怎么保证的。</p>
+
+<h4 id="原子性-atomicity">原子性(Atomicity)</h4>
+
+<blockquote>
+<p>&emsp;&emsp;想要保证事务的原子性，就需要在异常发生时，对已经执行的操作进行回滚，在MySQL中，恢复机制是通过回滚日志（undo log）实现的，所有事务进行的修改都会先记录到这个回滚日志中，然后在对数据库中的对应行进行写入。<br />
+&emsp;&emsp;就像你去超市东西要么交钱拿东西一起都执行，要么要是买不到东西，就退钱。</p>
+</blockquote>
+
+<h4 id="隔离性-isolation">隔离性(Isolation)</h4>
+
+<blockquote>
+<p><img src="http://www.ruibg.com/media/posts/数据库隔离级别.png" alt="隔离性" />
+可参考此图理解，详细就不在表述了。</p>
+</blockquote>
+
+<h4 id="持久性-durability">持久性(Durability)</h4>
+
+<blockquote>
+<p>&emsp;&emsp;意味着在事务完成以后，该事务所对数据库所作的更改便持久的保存在数据库之中，并不会被回滚。即使出现了任何事故比如断电等，事务一旦提交，则持久化保存在数据库中。</p>
+</blockquote>
+
+<h4 id="一致性-consistency">一致性(Consistency)</h4>
+
+<blockquote>
+<p>&emsp;&emsp;事务的一致性指的是在一个事务执行之前和执行之后数据库都必须处于一致性状态。如果事务成功地完成，那么系统中所有变化将正确地应用，系统处于有效状态。如果在事务中出现错误，那么系统中的所有变化将自动地回滚，系统返回到原始状态。<br />
+&emsp;&emsp;一致性是事务要达到的最终状态。一致性可以区分为“外部一致性”和“内部一致性”。所谓的“内部一致性”就是指单机事务的一致性。“外部一致性”是针对分布式系统来说的，由于分布式系统写入和读取可能不在同一台机器上，而这必然会有一段时间导致不同机器上所存的数据不一致的情况，这就是所谓的“不一致时间窗口”。</p>
+</blockquote>
+
+<h3 id="分布式事务">分布式事务</h3>
+
+<h4 id="分布式事务产生的原因">分布式事务产生的原因</h4>
+
+<p>1）数据库数据量大，对数据库进行分库分表。<br />
+2）业务拆分。比如电商业务会有商品、订单、支付、促销等服务域，每个域都有各自独立的数据库。</p>
+
+<h4 id="分布式事务的基础">分布式事务的基础</h4>
+
+<p>&emsp;&emsp;在分布式事务中，ACID是很难达到的，即使达到了性能也会受到很大的影响，这种时候需要一个新的理论来支持分布式事务，也就是CAP理论和BASE理论。</p>
+
+<h5 id="cap理论">CAP理论</h5>
+
+<p>CAP理论又被叫作布鲁尔定理。对于设计分布式系统来说CAP就是入门理论。</p>
+
+<ul>
+<li>C (一致性，Consistency):对某个指定的客户端来说，读操作能返回最新的写操作。对于数据分布在不同节点上的数据上来说，如果在某个节点更新了数据，那么在其他节点如果都能读取到这个最新的数据，那么就称为强一致，如果有某个节点没有读取到，那就是分布式不一致。</li>
+<li>A(可用性，Availability)：非故障的节点在合理的时间内返回合理的响应(不是错误和超时的响应)。可用性的两个关键一个是合理的时间，一个是合理的响应。合理的时间指的是请求不能无限被阻塞，应该在合理的时间给出返回。合理的响应指的是系统应该明确返回结果并且结果是正确的。</li>
+<li>P(分区容错性，Partition tolerance):当出现网络分区后，系统能够继续工作。打个比方，这里个集群有多台机器，有台机器网络出现了问题，但是这个集群仍然可以正常工作。<br />
+<br /></li>
+</ul>
+
+<p>&emsp;&emsp;在分布式系统中，网络无法100%可靠，分区其实是一个必然现象，如果我们选择了一致性、可用性而放弃了分区容错性，那么当发生分区现象时，为了保证一致性，这个时候必须拒绝请求，但是可用性又不允许，所以分布式系统理论上不可能选择一致性、可用性架构，只能选择一致性、分区容错性或者可用性、分区容错性架构。<br />
+  &emsp;&emsp;对于CP来说，放弃可用性，追求一致性和分区容错性，zookeeper其实就是追求的强一致。<br />
+  &emsp;&emsp;对于AP来说，放弃一致性(这里说的一致性是强一致性)，追求分区容错性和可用性，这是很多分布式系统设计时的选择，后面的BASE也是根据AP来扩展。<br />
+  &emsp;&emsp;CAP理论中是忽略网络延迟，但是在现实中总会有一定的时间是不一致。同时CAP中选择两个，比如你选择了CP，并不是叫你放弃A。因为P出现的概率实在是太小了，大部分的时间你仍然需要保证CA。就算分区出现了你也要为后来的A做准备，比如通过一些日志的手段，使其他机器回复至可用，这叫做补偿事务。</p>
+
+<h5 id="base理论">BASE理论</h5>
+
+<p>在分布式系统中，我们往往追求的是可用性，它的重要程序比一致性要高，那么如何实现高可用性呢？ 前人已经给我们提出来了另外一个理论，就是BASE理论，它是用来对CAP定理进行进一步扩充的。BASE理论指的是：</p>
+
+<ul>
+<li>Basically Available（基本可用）:分布式系统在出现故障时，允许损失部分可用功能，保证核心功能可用。</li>
+<li>Soft state（软状态）：允许系统中存在中间状态，这个状态不影响系统可用性，这里指的是CAP中的不一致。</li>
+<li>Eventually consistent（最终一致性）：最终一致:最终一致是指经过一段时间后，所有节点数据都将会达到一致。</li>
+</ul>
+
+<p>&emsp;&emsp;BASE解决了CAP中理论没有网络延迟，在BASE中用软状态和最终一致，保证了延迟后的一致性。BASE和 ACID 是相反的，它完全不同于ACID的强一致性模型，而是通过牺牲强一致性来获得可用性，并允许数据在一段时间内是不一致的，但最终达到一致状态。</p>
+
+<h4 id="分布式事务解决方案">分布式事务解决方案</h4>
+
+<p>&emsp;&emsp;再说解决方案之前，我们先思考下是否一定需要分布式事务。在我们进行系统架构设计之前，要考虑到开发成本，防止过度设计，有时候可以把需要事务的微服务聚合成一个单机服务，使用数据库的单机事务。因为分布式事务的开发成本还是很高的，千万不要为了追求设计，尔引入不必要的成本和复杂度。</p>
+
+<h5 id="基于xa协议的两阶段提交-2pc">基于XA协议的两阶段提交（2PC）</h5>
+
+<p><img src="http://www.ruibg.com/media/posts/XA协议.png" alt="2PC" />
+&emsp;&emsp;分为两个阶段：第一阶段是表决阶段，所有参与者都将本事务能否成功的信息反馈发给协调者；第二阶段是执行阶段，协调者根据所有参与者的反馈，通知所有参与者，步调一致地在所有分支上提交或者回滚。</p>
+
+<ul>
+<li>2PC优点： 尽量保证了数据的强一致，实现成本低，适合对数据强一致要求很高的关键领域。（其实也不能100%保证强一致）</li>
+
+<li><p>2PC缺点： 第二个阶段协调器要等待所有服务通知成功或者是一个通知失败，会锁住资源，对性能不好；或者协调器挂了怎么处理；节点数据不一致问题</p>
+
+<h5 id="tcc方案">TCC方案</h5>
+
+<p><img src="http://www.ruibg.com/media/posts/TCC.png" alt="TCC" />
+&emsp;&emsp;TCC方案是对2PC的改进，解决了几个缺点：1.由主业务方发起并完成这个业务活动。业务活动管理器也变成多点，引入集群。 2.引入超时机制，超时后进行补偿，并且不会锁定整个资源，将资源转换为业务逻辑形式，粒度变小。 3.数据一致性，有了补偿机制之后，由业务活动管理器控制一致性。</p></li>
+</ul>
+
+<ol>
+<li>Try阶段：尝试执行,完成所有业务检查（一致性）,预留必须业务资源（准隔离性）</li>
+<li>Confirm阶段：确认执行真正执行业务，不作任何业务检查，只使用Try阶段预留的业务资源，Confirm操作满足幂等性。要求具备幂等设计，Confirm失败后需要进行重试。</li>
+<li>Cancel阶段：取消执行，释放Try阶段预留的业务资源 Cancel操作满足幂等性Cancel阶段的异常和Confirm阶段异常处理方案基本上一致。
+<br /></li>
+</ol>
+
+<p>&emsp;&emsp;TCC方案也有自己的优缺点：</p>
+
+<ul>
+<li>优点：自己定义数据库操作的粒度，使得降低锁冲突、提高吞吐量</li>
+
+<li><p>缺点：对应用的侵入性强；实现难度大;开发成本高</p>
+
+<h5 id="本地消息表">本地消息表</h5>
+
+<p><img src="http://www.ruibg.com/media/posts/本地消息表.png" alt="本地消息表" />
+&emsp;&emsp;此方案的核心是将需要分布式处理的任务通过消息日志的方式来异步执行。消息日志可以存储到本地文本、数据库或消息队列，再通过业务规则自动或人工发起重试。人工重试更多的是应用于支付场景，通过对账系统对事后问题的处理。其执行流程：</p></li>
+
+<li><p>消息生产方，需要额外建一个消息表，并记录消息发送状态。insert message和update DB要在一个事务里提交，也就是说他们要在一个数据库里面(依靠数据库本地事务保证一致性）。然后消息会经过MQ发送到消息的消费方。如果消息发送失败，会进行重试发送。。</p></li>
+
+<li><p>消息消费方，需要处理这个消息，并完成自己的业务逻辑。此时如果本地事务处理成功，表明已经处理成功了，如果处理失败，那么就会重试执行。如果是业务上面的失败，可以给生产方发送一个业务补偿消息，通知生产方进行回滚等操作</p></li>
+
+<li><p>生产方和消费方定时扫描本地消息表，把还没处理完成的消息或者失败的消息再发送一遍。如果有靠谱的自动对账补账逻辑，这种方案还是非常实用的。</p></li>
+</ul>
+
+<p>&emsp;&emsp;本地消息队列是BASE理论，是最终一致模型，适用于对一致性要求不高的。实现这个模型时需要注意重试的幂等。</p>
+
+<p>&emsp;&emsp;但此方案有个很大的缺点：需要设计数据库消息表，同时还要有定时任务不断扫描消息表，消息表会耦合到业务系统中，导致业务系统由很多杂活要处理。</p>
+
+<h5 id="mq事务">MQ事务</h5>
+
+<p>&emsp;&emsp;有一些第三方的MQ是支持事务消息的，比如RocketMQ，它的事务支持实际上是对本地消息表的一个封装，将本地消息表移动到了MQ内部。但是市面上一些主流的MQ都是不支持事务消息的，比如 RabbitMQ 和 Kafka 都不支持。
+<img src="http://www.ruibg.com/media/posts/MQ事务.png" alt="MQ事务" /></p>
+
+<p>其执行流程：</p>
+
+<ol>
+<li>第一阶段发送Prepared消息，会拿到消息的地址</li>
+<li>执行本地事务</li>
+<li>通过第一阶段拿到的地址访问消息，并修改消息状态</li>
+<li>RocketMq会定期扫描消息集群中的事务消息，如果发现Prepared消息，会向生产者确认事务成功还是失败，然后RocketMq会根据生产者的策略来确定回滚还是继续发送消息</li>
+</ol>
+
+<p>详细可参考此文章<a href="https://www.jianshu.com/p/453c6e7ff81c" target="_blank">分布式开放消息系统(RocketMQ)的原理与实践</a></p>
+
+<h3 id="分布式事务框架">分布式事务框架</h3>
+
+<p>&emsp;&emsp;现在市面上有很多分布式事务框架：比如阿里的GTS，github开源的ByteTCC,tcc-transaction,LCN等等。现在我们来看下LCN是怎么实现分布式事务的。</p>
+
+<blockquote>
+<p>原理可查看WIKI&gt;&gt;&gt;<a href="https://github.com/codingapi/tx-lcn/wiki/LCN%E5%8E%9F%E7%90%86" target="_blank">LCN原理</a></p>
+</blockquote>
+
+<p>我们先运行下LCN的demo,我们先从github上将LCN的源码下载下来，然后启动tx-manager，启动前在配置文件中要配置好eureka地址和redis地址
+<img src="http://www.ruibg.com/media/posts/tx-manager配置.png" alt="tx-manager配置" />
+配置完成后，运行TxManagerApplication来启动tx-manager，启动完成后访问localhost:7000，界面显示如下：
+<img src="http://www.ruibg.com/media/posts/tx-manager页面.png" alt="tx-manager页面" />
+好了，现在tx-manager启动成功，我们运行下springcloud版本的demo，下载地址<a href="https://github.com/codingapi/springcloud-lcn-demo" target="_blank">springcloud版本</a>,先执行数据库初始化脚本</p>
+
+<blockquote>
+<p>USE db1;<br />
+DROP TABLE IF EXISTS <code>t_test</code>;<br />
+CREATE TABLE <code>t_test</code> (<br />
+&emsp;<code>id</code> int(11) unsigned NOT NULL AUTO_INCREMENT,<br />
+&emsp;<code>name</code> varchar(50) DEFAULT NULL,<br />
+&emsp;PRIMARY KEY (<code>id</code>)<br />
+) ENGINE=InnoDB DEFAULT CHARSET=UTF-8;</p>
+</blockquote>
+
+<p>比如运行mybatis的demo，先在sprincloud-mybatis-demo1的配置文件中配置好eureka地址、tx-manager的地址，数据库地址，sprincloud-mybatis-demo2的的配置文件中配置好eureka地址、数据库地址， 然后启动sprincloud-mybatis-demo1和sprincloud-mybatis-demo2，访问<a href="http://127.0.0.1:8081/demo/save">http://127.0.0.1:8081/demo/save</a> ，请求后会出现异常页面，因为代码里有  <code>int v = 100/0;</code>然后观察数据库没有数据插入，当把这句代码注释后再执行，会发现两个数据库都会有数据插入。注意，在使用LCN时候，在事务的发起方要配置<code>@TxTransaction(isStart = true)</code>，因为分布式事务需要一个唯一标识groupId，如果在发起方没有配置这个会导致groupId不会生成，系统报错。
+<img src="http://www.ruibg.com/media/posts/LCN发起方.png" alt="LCN发起方" /></p>
+</article>
+    <footer class="post-footer">
+      
+      <ul class="post-tags">
+        
+          <li><a href="http://www.ruibg.com/tags/%E5%88%86%E5%B8%83%E5%BC%8F"><span class="tag">分布式</span></a></li>
+        
+          <li><a href="http://www.ruibg.com/tags/%E4%BA%8B%E5%8A%A1"><span class="tag">事务</span></a></li>
+        
+          <li><a href="http://www.ruibg.com/tags/spring-cloud"><span class="tag">Spring Cloud</span></a></li>
+        
+      </ul>
+      
+      <p class="post-copyright">
+        Copyright © 2018 - 2018  懒猫raibg.com 版权所有
+      </p>
+    </footer>
+    
+      <div id="disqus_thread"></div>
+<script type="application/javascript">
+    var disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "disqus_shortname" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+      
+    
+  </section>
+  <footer class="site-footer">
+  <p>© 2017-2018 懒猫博客</p>
+  <p>Powered by <a href="https://gohugo.io/" target="_blank">Hugo</a> with theme <a href="https://github.com/laozhu/hugo-nuo" target="_blank">Nuo</a>.</p>
+  
+</footer>
+
+
+
+<script async src="//cdn.bootcss.com/video.js/6.2.8/alt/video.novtt.min.js"></script>
+<script async src="//cdn.bootcss.com/mathjax/2.7.2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    tex2jax: {
+      inlineMath: [['$','$'], ['\\(','\\)']],
+      displayMath: [['$$','$$'], ['\\[','\\]']],
+      processEscapes: true,
+      processEnvironments: true,
+      skipTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
+      TeX: { equationNumbers: { autoNumber: "AMS" },
+      extensions: ["AMSmath.js", "AMSsymbols.js"] }
+    }
+  });
+</script>
+<script type="text/x-mathjax-config">
+  // Fix <code> tags after MathJax finishes running. This is a
+  // hack to overcome a shortcoming of Markdown. Discussion at
+  // https://github.com/mojombo/jekyll/issues/199
+  MathJax.Hub.Queue(() => {
+    MathJax.Hub.getAllJax().map(v => v.SourceElement().parentNode.className += ' has-jax');
+  });
+</script>
+
+<script src="http://www.ruibg.com/js/bundle.dcfab747ba.js"></script>
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-XXXXXXXX-X', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+
+
+<script>
+var _hmt = _hmt || [];
+(function() {
+  var hm = document.createElement("script");
+  hm.src = "https://hm.baidu.com/hm.js?ae14c6dde250abce36bba430b9f32597";
+  var s = document.getElementsByTagName("script")[0];
+  s.parentNode.insertBefore(hm, s);
+})();
+</script>
+
+
+
+  </body>
+</html>

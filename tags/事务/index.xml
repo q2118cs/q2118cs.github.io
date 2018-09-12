@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Posts on 懒猫博客</title>
-    <link>http://www.ruibg.com/post/</link>
-    <description>Recent content in Posts on 懒猫博客</description>
+    <title>事务 on 懒猫博客</title>
+    <link>http://www.ruibg.com/tags/%E4%BA%8B%E5%8A%A1/</link>
+    <description>Recent content in 事务 on 懒猫博客</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en</language>
     <copyright>Copyright © 2018 - 2018  懒猫raibg.com 版权所有</copyright>
     <lastBuildDate>Tue, 04 Sep 2018 00:00:00 +0000</lastBuildDate>
     
-	<atom:link href="http://www.ruibg.com/post/index.xml" rel="self" type="application/rss+xml" />
+	<atom:link href="http://www.ruibg.com/tags/%E4%BA%8B%E5%8A%A1/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
@@ -42,62 +42,6 @@ BASE理论 在分布式系统中，我们往往追求的是可用性，它的重
  Basically Available（基本可用）:分布式系统在出现故障时，允许损失部分可用功能，保证核心功能可用。 Soft state（软状态）：允许系统中存在中间状态，这个状态不影响系统可用性，这里指的是CAP中的不一致。 Eventually consistent（最终一致性）：最终一致:最终一致是指经过一段时间后，所有节点数据都将会达到一致。  &amp;emsp;&amp;emsp;BASE解决了CAP中理论没有网络延迟，在BASE中用软状态和最终一致，保证了延迟后的一致性。BASE和 ACID 是相反的，它完全不同于ACID的强一致性模型，而是通过牺牲强一致性来获得可用性，并允许数据在一段时间内是不一致的，但最终达到一致状态。
 分布式事务解决方案 &amp;emsp;&amp;emsp;再说解决方案之前，我们先思考下是否一定需要分布式事务。在我们进行系统架构设计之前，要考虑到开发成本，防止过度设计，有时候可以把需要事务的微服务聚合成一个单机服务，使用数据库的单机事务。因为分布式事务的开发成本还是很高的，千万不要为了追求设计，尔引入不必要的成本和复杂度。
 基于XA协议的两阶段提交（2PC） &amp;emsp;&amp;emsp;分为两个阶段：第一阶段是表决阶段，所有参与者都将本事务能否成功的信息反馈发给协调者；第二阶段是执行阶段，协调者根据所有参与者的反馈，通知所有参与者，步调一致地在所有分支上提交或者回滚。</description>
-    </item>
-    
-    <item>
-      <title>Creating a New Theme</title>
-      <link>http://www.ruibg.com/post/creating-a-new-theme/</link>
-      <pubDate>Sun, 28 Sep 2014 00:00:00 +0000</pubDate>
-      
-      <guid>http://www.ruibg.com/post/creating-a-new-theme/</guid>
-      <description>Introduction This tutorial will show you how to create a simple theme in Hugo. I assume that you are familiar with HTML, the bash command line, and that you are comfortable using Markdown to format content. I&amp;rsquo;ll explain how Hugo uses templates and how you can organize your templates to create a theme. I won&amp;rsquo;t cover using CSS to style your theme.
-We&amp;rsquo;ll start with creating a new site with a very basic template.</description>
-    </item>
-    
-    <item>
-      <title>(Hu)go Template Primer</title>
-      <link>http://www.ruibg.com/post/goisforlovers/</link>
-      <pubDate>Mon, 28 Jul 2014 00:00:00 +0000</pubDate>
-      
-      <guid>http://www.ruibg.com/post/goisforlovers/</guid>
-      <description>Hugo uses the excellent go html/template library for its template engine. It is an extremely lightweight engine that provides a very small amount of logic. In our experience that it is just the right amount of logic to be able to create a good static website. If you have used other template systems from different languages or frameworks you will find a lot of similarities in go templates.
-This document is a brief primer on using go templates.</description>
-    </item>
-    
-    <item>
-      <title>Getting Started with Hugo</title>
-      <link>http://www.ruibg.com/post/hugoisforlovers/</link>
-      <pubDate>Wed, 02 Apr 2014 00:00:00 +0000</pubDate>
-      
-      <guid>http://www.ruibg.com/post/hugoisforlovers/</guid>
-      <description>Step 1. Install Hugo Goto hugo releases and download the appropriate version for your os and architecture.
-Save it somewhere specific as we will be using it in the next step.
-More complete instructions are available at installing hugo
-Step 2. Build the Docs Hugo has its own example site which happens to also be the documentation site you are reading right now.
-Follow the following steps:
- Clone the hugo repository Go into the repo Run hugo in server mode and build the docs Open your browser to http://localhost:1313  Corresponding pseudo commands:</description>
-    </item>
-    
-    <item>
-      <title>Migrate to Hugo from Jekyll</title>
-      <link>http://www.ruibg.com/post/migrate-from-jekyll/</link>
-      <pubDate>Mon, 10 Mar 2014 00:00:00 +0000</pubDate>
-      
-      <guid>http://www.ruibg.com/post/migrate-from-jekyll/</guid>
-      <description>Move static content to static Jekyll has a rule that any directory not starting with _ will be copied as-is to the _site output. Hugo keeps all static content under static. You should therefore move it all there. With Jekyll, something that looked like
-▾ &amp;lt;root&amp;gt;/ ▾ images/ logo.png  should become
-▾ &amp;lt;root&amp;gt;/ ▾ static/ ▾ images/ logo.png  Additionally, you&amp;rsquo;ll want any files that should reside at the root (such as CNAME) to be moved to static.</description>
-    </item>
-    
-    <item>
-      <title>Hugo 主题 Nuo 文章样式预览</title>
-      <link>http://www.ruibg.com/post/hugo-nuo-post-preview/</link>
-      <pubDate>Wed, 17 Jul 2013 00:00:00 +0000</pubDate>
-      
-      <guid>http://www.ruibg.com/post/hugo-nuo-post-preview/</guid>
-      <description>&lt;p&gt;这篇文章集中说明本人博客主题所支持的 Markdown 语法和 Hugo Shortcodes 插件，你也可以在这里预览到他们的样子。如果你不喜欢某些部分的样式，可以去修改 &lt;code&gt;content.scss&lt;/code&gt; 和 &lt;code&gt;shortcodes.scss&lt;/code&gt; 这两个文件。预告一下，我所用的这个名为 &lt;code&gt;Nuo&lt;/code&gt; 的 &lt;code&gt;Hugo&lt;/code&gt; 也将于近期发布，敬请期待。&lt;/p&gt;
-
-&lt;p&gt;&lt;/p&gt;</description>
     </item>
     
   </channel>
